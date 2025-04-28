@@ -11,7 +11,8 @@ from datetime import datetime
 import os
 
 # --- Configurations ---
-client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
+def get_openai_client():
+    return openai.OpenAI(api_key=st.secrets["openai_api_key"])
 st.set_page_config(page_title="GTM AI Sales Assistant", page_icon="🤖")
 st.title("🤖 GTM AI Sales Assistant")
 
@@ -75,6 +76,7 @@ No commentary.
 Now classify this input:
 User Input: "{user_input}"
 """
+    client = get_openai_client()
 
     response = client.chat.completions.create(
         model="gpt-4-turbo",
@@ -138,6 +140,8 @@ Readiness Score: {account_info['Readiness Score (%)']}%
 Write a very concise 1-sentence business summary for why this account is at this readiness score, highlighting 2-3 key factors and for the accounts with a higher score focus on the positives, for the accounts with a lower score focus on the negatives but include both positives and negatives in both cases.
 """
             try:
+                client = get_openai_client()
+
                 response = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[{"role": "user", "content": insight_prompt}],
@@ -268,6 +272,8 @@ Some explanation on the existing features in the dataset for context:
 
 """
                 try:
+                    client = get_openai_client()
+
                     response = client.chat.completions.create(
                         model="gpt-4-turbo",
                         messages=[{"role": "user", "content": details}],
