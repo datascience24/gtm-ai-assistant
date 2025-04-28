@@ -12,7 +12,12 @@ import os
 
 # --- Configurations ---
 def get_openai_client():
-    return openai.OpenAI(api_key=st.secrets["openai_api_key"])
+    try:
+        return openai.OpenAI(api_key=st.secrets["openai_api_key"])
+    except Exception as e:
+        st.error(f"Error initializing OpenAI client: {e}")
+        return None
+
 st.set_page_config(page_title="GTM AI Sales Assistant", page_icon="🤖")
 st.title("🤖 GTM AI Sales Assistant")
 
@@ -60,6 +65,10 @@ if "accounts_df" not in st.session_state:
 
 # --- Functions ---
 def classify_intent_with_openai(user_input):
+    client = get_openai_client()
+    if not client:
+        return {"intent": "other", "account": ""}
+    
     prompt = f"""
 You are a strict JSON classification assistant. Given a user input from a sales team member, classify the intent into one of:
 - get_readiness_scores
@@ -76,19 +85,23 @@ No commentary.
 Now classify this input:
 User Input: "{user_input}"
 """
-    client = get_openai_client()
 
-    response = client.chat.completions.create(
-        model="gpt-4-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-
-    result_text = response.choices[0].message.content.strip()
     try:
-        result = json.loads(result_text)
-    except json.JSONDecodeError:
+        response = client.chat.completions.create(
+            model="gpt-4-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0
+        )
+
+        result_text = response.choices[0].message.content.strip()
+        try:
+            result = json.loads(result_text)
+        except json.JSONDecodeError:
+            result = {"intent": "other", "account": ""}
+    except Exception as e:
+        st.error(f"OpenAI API error: {e}")
         result = {"intent": "other", "account": ""}
+        
     return result
 
 # --- Main App ---
@@ -120,10 +133,13 @@ if uploaded_file := st.file_uploader("Upload your account CSV", type=["csv"]):
         accounts_df["Readiness Score (%)"] = (model.predict_proba(X_scaled)[:, 1] * 100).round(1)
 
         # --- Generate Key Insights at Upload ---
+        client = get_openai_client()
         insights = []
-        for idx, row in accounts_df.iterrows():
-            account_info = row
-            insight_prompt = f"""
+        
+        if client:
+            for idx, row in accounts_df.iterrows():
+                account_info = row
+                insight_prompt = f"""
 Account Details for {account_info['Account Name']}:
 - Industry: {account_info['Industry']}
 - Revenue: {account_info['Revenue ($)']}
@@ -139,19 +155,21 @@ Readiness Score: {account_info['Readiness Score (%)']}%
 
 Write a very concise 1-sentence business summary for why this account is at this readiness score, highlighting 2-3 key factors and for the accounts with a higher score focus on the positives, for the accounts with a lower score focus on the negatives but include both positives and negatives in both cases.
 """
-            try:
-                client = get_openai_client()
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": insight_prompt}],
+                        temperature=0.5
+                    )
+                    insight = response.choices[0].message.content.strip()
+                except Exception as e:
+                    st.warning(f"Insight generation error for {account_info['Account Name']}: {e}")
+                    insight = "Insight generation error."
 
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": insight_prompt}],
-                    temperature=0.5
-                )
-                insight = response.choices[0].message.content.strip()
-            except Exception as e:
-                insight = "Insight generation error."
-
-            insights.append(insight)
+                insights.append(insight)
+        else:
+            # Fallback if OpenAI client initialization failed
+            insights = ["Insight generation unavailable. Check API key configuration."] * len(accounts_df)
 
         accounts_df["Key Insight"] = insights
 
@@ -177,16 +195,12 @@ Write a very concise 1-sentence business summary for why this account is at this
     - **Low Readiness Accounts (< 40%):** {len(low_readiness)} accounts totaling **${low_revenue:,.0f}** in revenue
     """)
 
-
-
     st.success("The accounts were evaluated with a logistic regression model. \n \n The key features are Usage Trend, Engagement Score, Industry, Revenue, ARR with Rubrik, Expansion Potential, and Renewal Date. \n \n  Here are the readiness scores and insights:")
     display_cols = [
         "Readiness Score (%)", "Account Name", "Key Insight", "Industry", "Revenue ($)", "Rubrik ARR ($)",
         "Engagement Score", "Event Attendance", "Renewal Date", "Usage Trend", "Strategic Account", "Expansion Potential"
     ]
     
-
-
     st.markdown("### 📊 Portfolio Overview")
 
     # Split into two columns
@@ -215,15 +229,13 @@ Write a very concise 1-sentence business summary for why this account is at this
         ax2.set_title('💵 Revenue per Readiness Range')
         st.pyplot(fig2)
 
-# Then continue with your download buttons and tables...
-
     # --- 📥 Download Button ---
     st.download_button(
     label="📥 Download Prioritized Accounts (CSV)",
     data=accounts_df[display_cols].sort_values(by="Readiness Score (%)", ascending=False).to_csv(index=False),
     file_name="prioritized_accounts.csv",
     mime="text/csv"
-)
+    )
 
     st.markdown("## 📋 Detailed Accounts Table")
     st.dataframe(accounts_df[display_cols].sort_values(by="Readiness Score (%)", ascending=False), use_container_width=True)
@@ -241,7 +253,6 @@ Write a very concise 1-sentence business summary for why this account is at this
             st.success("Here are the accounts ranked by readiness:")
             st.dataframe(accounts_df[display_cols].sort_values(by="Readiness Score (%)", ascending=False))
         
-
         elif intent == "explain_account_readiness" and account_name:
             account_row = accounts_df[accounts_df["Account Name"].str.lower() == account_name.lower()]
             if not account_row.empty:
@@ -269,20 +280,21 @@ Some explanation on the existing features in the dataset for context:
 - If Expansion Potential = 0, it indicates the account already spends a large proportion (>10%) of its revenue on Rubrik, suggesting strong current commitment. Upsell opportunities might be limited unless new product offerings are introduced.
 - If Expansion Potential = 1, there is opportunity to upsell based on unused budget.
 - If Renewal Date is within the next 90 days, that is a positive opportunity for renewal discussions.
-
 """
-                try:
-                    client = get_openai_client()
-
-                    response = client.chat.completions.create(
-                        model="gpt-4-turbo",
-                        messages=[{"role": "user", "content": details}],
-                        temperature=0.5
-                    )
-                    dynamic_insight = response.choices[0].message.content.strip()
-                    st.success(dynamic_insight)
-                except Exception as e:
-                    st.error(f"OpenAI API error: {e}")
+                client = get_openai_client()
+                if client:
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-4-turbo",
+                            messages=[{"role": "user", "content": details}],
+                            temperature=0.5
+                        )
+                        dynamic_insight = response.choices[0].message.content.strip()
+                        st.success(dynamic_insight)
+                    except Exception as e:
+                        st.error(f"OpenAI API error: {e}")
+                else:
+                    st.error("OpenAI client not available. Check API key configuration.")
             else:
                 st.error("Account not found.")
 
@@ -314,16 +326,20 @@ Guidelines for improvement:
 
 Based on these guidelines and the account's current data, write 2-3 concise sentences suggesting how the account's readiness could be improved.
 """
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-4-turbo",
-                        messages=[{"role": "user", "content": improvement_prompt}],
-                        temperature=0.5
-                    )
-                    improvement_advice = response.choices[0].message.content.strip()
-                    st.success(improvement_advice)
-                except Exception as e:
-                    st.error(f"OpenAI API error: {e}")
+                client = get_openai_client()
+                if client:
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-4-turbo",
+                            messages=[{"role": "user", "content": improvement_prompt}],
+                            temperature=0.5
+                        )
+                        improvement_advice = response.choices[0].message.content.strip()
+                        st.success(improvement_advice)
+                    except Exception as e:
+                        st.error(f"OpenAI API error: {e}")
+                else:
+                    st.error("OpenAI client not available. Check API key configuration.")
             else:
                 st.error("Account not found.")
 
@@ -385,11 +401,8 @@ Based on these guidelines and the account's current data, write 2-3 concise sent
             if not matched:
                 st.info("I'm not sure which field you want to filter by. Try mentioning 'usage trend', 'strategic account', 'event attendance', etc.")
 
-
         else:
             st.info("I'm currently focused on analyzing readiness and suggesting sales actions. Please ask about account insights!")
-
-
 
 else:
     st.info("👆 Please upload your account data CSV to get started.")
