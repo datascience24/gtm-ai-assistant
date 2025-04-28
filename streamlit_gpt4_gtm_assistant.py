@@ -11,7 +11,7 @@ from datetime import datetime
 import os
 
 # --- Configurations ---
-client = openai.OpenAI(api_key="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")
+client = openai.OpenAI(api_key=st.secrets["openai_api_key"])
 st.set_page_config(page_title="GTM AI Sales Assistant", page_icon="🤖")
 st.title("🤖 GTM AI Sales Assistant")
 
