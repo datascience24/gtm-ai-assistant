@@ -106,12 +106,12 @@ User Input: "{user_input}"
 
 # --- Main App ---
 if uploaded_file := st.file_uploader("Upload your account CSV", type=["csv"]):
-st.download_button(
-    label="📥 Download Mock Account Data",
-    data=open("mock_accounts.csv", "rb"),
-    file_name="mock_accounts.csv",
-    mime="text/csv"
-)
+    st.download_button(
+        label="📥 Download Mock Account Data",
+        data=open("mock_accounts.csv", "rb"),
+        file_name="mock_accounts.csv",
+        mime="text/csv"
+    )
     if st.session_state.accounts_df is None:
         accounts_df = pd.read_csv(uploaded_file)
 
