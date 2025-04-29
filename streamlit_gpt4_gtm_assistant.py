@@ -159,7 +159,7 @@ Account Details for {account_info['Account Name']}:
 
 Readiness Score: {account_info['Readiness Score (%)']}%
 
-Write a very concise 1-sentence business summary for why this account is at this readiness score, highlighting 2-3 key factors and for the accounts with a higher score focus on the positives, for the accounts with a lower score focus on the negatives but include both positives and negatives in both cases.
+Write a very concise 1-sentence business summary for why this account is at this readiness score, highlighting 2-3 key factors and for the accounts with a higher score relatively in the dataset focus on the positives, for the accounts with a lower score focus on the negatives but include both positives and negatives in both cases.
 """
                 try:
                     response = client.chat.completions.create(
