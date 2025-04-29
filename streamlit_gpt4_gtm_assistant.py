@@ -49,7 +49,6 @@ with st.sidebar:
     st.header("🛠️ About this App")
     st.write(
         "This assistant helps sales teams prioritize accounts using a logistic regression model based on engagement, usage, and other factors. OpenAI's LLM is used to provide key insights from the features and powers the AI chatbot for followup questions."
-        "Upload your CSV to get started!"
     )
     
     st.header("💬 Example Questions You Can Ask")
