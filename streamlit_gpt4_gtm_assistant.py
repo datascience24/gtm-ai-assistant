@@ -26,7 +26,7 @@ st.download_button(
         file_name="mock_accounts.csv",
         mime="text/csv"
     )
-st.write("Model will take about 1.5-2 minutes to load and process data after you upload CSV")
+st.write("Download above mock data and input below. Model will take about 1.5-2 minutes to load and process data after you upload CSV")
 
 st.markdown("""
     <style>
