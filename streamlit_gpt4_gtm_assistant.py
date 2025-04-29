@@ -63,7 +63,7 @@ with st.sidebar:
     """)
 
     st.header("📩 Contact")
-    st.write("Questions? Reach out to the analytics team.")
+    st.write("Questions? Reach out to Rootvij Bage at rootie7@gmail.com.")
 
 
 # --- Session State Setup ---
